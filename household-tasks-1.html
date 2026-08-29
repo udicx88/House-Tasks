@@ -227,6 +227,28 @@
   .view-tab.active{background:var(--ink); color:#fff;}
 
   .day-section{margin-bottom:18px;}
+
+  .week-nav{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    background:var(--board); border:1px solid var(--line); border-radius:14px;
+    padding:8px 10px; margin-bottom:16px; box-shadow:var(--shadow-1);
+  }
+  .week-nav-arrow{
+    flex:none; width:40px; height:40px; border-radius:10px; border:none; background:transparent;
+    color:var(--ink); cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:background .12s ease, transform .12s ease;
+  }
+  .week-nav-arrow:hover{background:var(--bg);}
+  .week-nav-arrow:active{transform:scale(.9);}
+  .week-nav-label{flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; min-width:0;}
+  .week-nav-label .range{font-weight:800; font-size:.95rem; font-family:'Heebo',sans-serif;}
+  .week-nav-label .tag-current{font-size:.72rem; color:var(--later); font-weight:700;}
+  .week-nav-today{
+    border:none; background:var(--week-bg); color:var(--week); font-family:'Assistant',sans-serif;
+    font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:999px; cursor:pointer;
+    min-height:26px; transition:transform .12s ease;
+  }
+  .week-nav-today:active{transform:scale(.94);}
   .day-head{
     display:flex; align-items:baseline; gap:8px; margin-bottom:8px; padding-bottom:6px;
     border-bottom:2px solid var(--line);
@@ -445,6 +467,7 @@ let toastTimer = null;
 let expandedIds = new Set();
 let currentChecklist = [];
 let viewMode = 'week';
+let currentWeekStart = startOfWeek(todayStr());
 let completedExpanded = false;
 
 function todayStr(){
@@ -611,43 +634,78 @@ function renderCompletedSection(list){
   `;
 }
 
+function startOfWeek(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() - d.getDay()); // getDay(): Sunday=0, matches our week start
+  return d.toISOString().slice(0,10);
+}
+
+function renderWeekNav(weekStart){
+  const weekEnd = addDays(weekStart, 6);
+  const isCurrentWeek = weekStart === startOfWeek(todayStr());
+  return `
+    <div class="week-nav">
+      <button type="button" class="week-nav-arrow" data-week-prev title="שבוע קודם">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <div class="week-nav-label">
+        <span class="range">${formatDate(weekStart)} – ${formatDate(weekEnd)}</span>
+        ${isCurrentWeek
+          ? '<span class="tag-current">השבוע הזה</span>'
+          : '<button type="button" class="week-nav-today" data-week-today>חזרה להיום</button>'}
+      </div>
+      <button type="button" class="week-nav-arrow" data-week-next title="שבוע הבא">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+    </div>`;
+}
+
 function renderWeekView(){
   const content = document.getElementById('content');
   const visible = tasks.filter(t => filter === 'all' || t.category === filter);
   const active = visible.filter(t => !t.done);
   const done = visible.filter(t => t.done);
 
+  const weekStart = currentWeekStart;
+  const isCurrentWeek = weekStart === startOfWeek(todayStr());
+  const nav = renderWeekNav(weekStart);
+
   if(tasks.length === 0){
-    content.innerHTML = `
+    content.innerHTML = nav + `
       <div class="empty">
         <h3>אין משימות כרגע</h3>
         <p>הוסיפו את המשימה הראשונה — ניקיון, תחזוקה או תור לרופא</p>
       </div>`;
+    wireWeekNav(content);
     return;
   }
 
   const today = todayStr();
   const nextUpId = findNextUpId(active);
-  const overdue = active.filter(t => daysBetween(today, t.dueDate) < 0)
-    .sort((a,b)=> (a.dueDate+(a.time||'')).localeCompare(b.dueDate+(b.time||'')));
 
-  let html = '';
-  if(overdue.length){
-    html += `<section class="day-section">
-      <div class="day-head">
-        <span class="name" style="color:var(--overdue)">באיחור</span>
-        <span class="day-count">${overdue.length}</span>
-      </div>
-      ${overdue.map(t => renderCard(t, {isNextUp: t.id === nextUpId})).join('')}
-    </section>`;
+  let html = nav;
+
+  // Overdue only makes sense relative to "today", so only show it on the current week
+  if(isCurrentWeek){
+    const overdue = active.filter(t => daysBetween(today, t.dueDate) < 0)
+      .sort((a,b)=> (a.dueDate+(a.time||'')).localeCompare(b.dueDate+(b.time||'')));
+    if(overdue.length){
+      html += `<section class="day-section">
+        <div class="day-head">
+          <span class="name" style="color:var(--overdue)">באיחור</span>
+          <span class="day-count">${overdue.length}</span>
+        </div>
+        ${overdue.map(t => renderCard(t, {isNextUp: t.id === nextUpId})).join('')}
+      </section>`;
+    }
   }
 
   for(let i=0; i<7; i++){
-    const date = addDays(today, i);
+    const date = addDays(weekStart, i);
     const dayTasks = active.filter(t => t.dueDate === date)
       .sort((a,b)=> (a.time || '99:99').localeCompare(b.time || '99:99') || a.title.localeCompare(b.title, 'he'));
     const d = new Date(date + 'T00:00:00');
-    const isToday = i === 0;
+    const isToday = date === today;
     html += `<section class="day-section">
       <div class="day-head ${isToday ? 'is-today' : ''}">
         <span class="name">${isToday ? 'היום · ' : ''}${DAY_NAMES[d.getDay()]}</span>
@@ -660,6 +718,16 @@ function renderWeekView(){
   html += renderCompletedSection(done);
   content.innerHTML = html;
   wireCardEvents(content);
+  wireWeekNav(content);
+}
+
+function wireWeekNav(content){
+  const prevBtn = content.querySelector('[data-week-prev]');
+  const nextBtn = content.querySelector('[data-week-next]');
+  const todayBtn = content.querySelector('[data-week-today]');
+  if(prevBtn) prevBtn.onclick = ()=>{ currentWeekStart = addDays(currentWeekStart, -7); render(); };
+  if(nextBtn) nextBtn.onclick = ()=>{ currentWeekStart = addDays(currentWeekStart, 7); render(); };
+  if(todayBtn) todayBtn.onclick = ()=>{ currentWeekStart = startOfWeek(todayStr()); render(); };
 }
 
 function renderListView(){
