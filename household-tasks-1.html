@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>לוח המשימות של הבית</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;800&family=Assistant:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #EEF1EC;
+    --board: #FFFFFF;
+    --ink: #202824;
+    --ink-soft: #5C6B63;
+    --line: #DCE3DA;
+    --overdue: #EF4444;
+    --overdue-bg: #FEE2E2;
+    --today: #F59E0B;
+    --today-bg: #FEF3C7;
+    --week: #3B82F6;
+    --week-bg: #DBEAFE;
+    --later: #10B981;
+    --later-bg: #D1FAE5;
+    --cat-clean: #10B981;
+    --cat-maint: #F97316;
+    --cat-doctor: #3B82F6;
+    --cat-other: #A855F7;
+    --radius: 18px;
+    --shadow-1: 0 1px 2px rgba(35,44,42,.06), 0 1px 6px rgba(35,44,42,.05);
+    --shadow-2: 0 2px 8px rgba(35,44,42,.10), 0 6px 20px rgba(35,44,42,.08);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Assistant', 'Heebo', sans-serif;
+    direction:rtl;
+    min-height:100vh;
+    padding:calc(20px + env(safe-area-inset-top, 0px)) 14px calc(100px + env(safe-area-inset-bottom, 0px));
+  }
+  h1,h2,h3{font-family:'Heebo', sans-serif; margin:0;}
+  button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, [tabindex]:focus-visible{
+    outline:2px solid var(--week); outline-offset:2px;
+  }
+  .wrap{max-width:640px; margin:0 auto;}
+  header.top{margin-bottom:18px;}
+  header.top h1{font-size:1.5rem; font-weight:800; letter-spacing:-0.01em;}
+  header.top p{margin:4px 0 0; color:var(--ink-soft); font-size:.9rem;}
+  .top-row{display:flex; align-items:flex-start; justify-content:space-between; gap:10px;}
+  .info-btn{
+    flex:none; width:36px; height:36px; border-radius:50%; border:1px solid var(--line);
+    background:var(--board); color:var(--ink-soft); font-size:1.2rem; font-weight:800;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:0;
+  }
+  .filters{display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:18px;}
+  .filters::-webkit-scrollbar{display:none;}
+  .chip{
+    flex:none; padding:8px 14px; border-radius:999px; border:1px solid var(--line);
+    background:var(--board); font-size:.85rem; font-weight:600; color:var(--ink-soft);
+    cursor:pointer; white-space:nowrap; transition:.15s; min-height:36px; display:inline-flex; align-items:center;
+  }
+  .chip.active{background:var(--ink); color:#fff; border-color:var(--ink);}
+  section.group{margin-bottom:20px;}
+  .group-head{
+    display:flex; align-items:center; gap:8px; margin-bottom:8px; padding:0 2px;
+  }
+  .group-head .dot{width:9px; height:9px; border-radius:50%;}
+  .group-head h2{font-size:.95rem; font-weight:800;}
+  .group-head .count{color:var(--ink-soft); font-size:.82rem; font-weight:600;}
+  .card{
+    background:var(--board); border:1px solid var(--line); border-radius:var(--radius);
+    padding:13px 14px; margin-bottom:10px; display:flex; align-items:flex-start; gap:12px;
+    box-shadow:var(--shadow-1); transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .card:active{transform:scale(.985); box-shadow:none;}
+  .check{
+    flex:none; width:32px; height:32px; border-radius:50%; border:2px solid var(--line);
+    margin-top:0; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:.15s; background:#fff;
+  }
+  .check:hover{border-color:var(--later);}
+  .check:active{transform:scale(.9);}
+  .check svg{opacity:0; transition:.15s;}
+  .card-body{flex:1; min-width:0;}
+  .card-title{font-weight:600; font-size:1rem; line-height:1.35;}
+  .card-meta{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; align-items:center;}
+  .tag{
+    font-size:.72rem; font-weight:600; padding:3px 9px; border-radius:999px;
+    display:inline-flex; align-items:center; gap:4px;
+  }
+  .tag .dot{width:7px; height:7px; border-radius:50%;}
+  .due-pill{font-size:.72rem; font-weight:700; padding:3px 9px; border-radius:999px;}
+  .recur-badge{font-size:.72rem; color:var(--ink-soft); display:inline-flex; align-items:center; gap:3px;}
+  .card-notes{font-size:.82rem; color:var(--ink-soft); margin-top:5px;}
+  .card-actions{flex:none; display:flex; flex-direction:column; gap:6px;}
+  .icon-btn{
+    width:36px; height:36px; border-radius:10px; border:none; background:transparent;
+    color:var(--ink-soft); cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:background .12s ease, transform .12s ease;
+  }
+  .icon-btn:hover{background:var(--bg);}
+  .icon-btn:active{transform:scale(.92);}
+  .empty{
+    text-align:center; padding:40px 20px; color:var(--ink-soft);
+  }
+  .empty h3{color:var(--ink); font-size:1.1rem; margin-bottom:6px;}
+  .empty button{margin-top:14px;}
+  .fab{
+    position:fixed; bottom:calc(22px + env(safe-area-inset-bottom, 0px)); left:50%; transform:translateX(-50%);
+    background:var(--ink); color:#fff; border:none; border-radius:999px;
+    padding:14px 26px; font-size:.95rem; font-weight:700; font-family:'Assistant',sans-serif;
+    display:flex; align-items:center; gap:8px; cursor:pointer; box-shadow:var(--shadow-2);
+    z-index:20; min-height:48px; transition:transform .12s ease;
+  }
+  .fab:active{transform:translateX(-50%) scale(.96);}
+  .overlay{
+    position:fixed; inset:0; background:rgba(20,24,22,.45); display:flex; align-items:flex-end;
+    justify-content:center; z-index:50; opacity:0; pointer-events:none; transition:.2s;
+  }
+  .overlay.show{opacity:1; pointer-events:auto;}
+  .modal{
+    background:var(--board); width:100%; max-width:520px; border-radius:24px 24px 0 0;
+    padding:10px 20px calc(28px + env(safe-area-inset-bottom, 0px)); max-height:88vh; overflow-y:auto;
+    transform:translateY(20px); transition:.2s; box-shadow:var(--shadow-2);
+  }
+  .modal::before{
+    content:''; display:block; width:36px; height:4px; border-radius:999px;
+    background:var(--line); margin:2px auto 14px;
+  }
+  .overlay.show .modal{transform:translateY(0);}
+  .modal h2{font-size:1.15rem; font-weight:800; margin-bottom:14px;}
+  label{display:block; font-size:.82rem; font-weight:600; color:var(--ink-soft); margin:14px 0 6px;}
+  input[type=text], input[type=date], input[type=number], textarea, select{
+    width:100%; border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+    font-family:'Assistant',sans-serif; font-size:.95rem; background:#fff; color:var(--ink);
+  }
+  textarea{resize:vertical; min-height:60px;}
+  .seg{display:flex; gap:6px; flex-wrap:wrap;}
+  .seg button{
+    flex:1; min-width:70px; padding:9px 6px; border-radius:10px; border:1px solid var(--line);
+    background:#fff; font-family:'Assistant',sans-serif; font-size:.85rem; font-weight:600;
+    color:var(--ink-soft); cursor:pointer;
+  }
+  .seg button.active{color:#fff; border-color:transparent;}
+  .modal-actions{display:flex; gap:10px; margin-top:22px;}
+  .btn{
+    flex:1; padding:12px; border-radius:12px; border:none; font-family:'Assistant',sans-serif;
+    font-size:.95rem; font-weight:700; cursor:pointer; min-height:46px;
+    transition:transform .12s ease, opacity .12s ease;
+  }
+  .btn:active{transform:scale(.97);}
+  .btn.primary{background:var(--ink); color:#fff;}
+  .btn.ghost{background:var(--bg); color:var(--ink);}
+  .btn.danger{background:var(--overdue-bg); color:var(--overdue);}
+  .custom-days{display:flex; align-items:center; gap:8px; margin-top:8px;}
+  .custom-days input{width:80px;}
+  .toast{
+    position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:10px; font-size:.85rem;
+    display:flex; align-items:center; gap:10px; opacity:0; pointer-events:none; transition:.25s; z-index:60;
+  }
+  .toast.show{opacity:1;}
+  .toast button{background:none; border:none; color:#9FE0C4; font-weight:700; cursor:pointer; font-family:inherit;}
+  .loading{text-align:center; padding:60px 0; color:var(--ink-soft); display:flex; flex-direction:column; align-items:center; gap:12px;}
+
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .spinner{
+    width:22px; height:22px; border-radius:50%;
+    border:3px solid var(--line); border-top-color:var(--week);
+    animation:spin .7s linear infinite; display:inline-block;
+  }
+
+  .top-progress{
+    position:fixed; top:0; right:0; left:0; height:3px; z-index:100;
+    background:transparent; overflow:hidden; opacity:0; transition:opacity .2s ease;
+  }
+  .top-progress.active{opacity:1;}
+  .top-progress::before{
+    content:''; position:absolute; top:0; bottom:0; width:40%; border-radius:0 0 0 3px;
+    background:var(--week);
+    animation:progress-slide 1.1s ease-in-out infinite;
+  }
+  @keyframes progress-slide{
+    0%{ right:-40%; }
+    100%{ right:100%; }
+  }
+
+  .checklist-progress{
+    display:inline-flex; align-items:center; gap:5px; font-size:.72rem; color:var(--ink-soft);
+    cursor:pointer; user-select:none;
+  }
+  .checklist-progress .bar{width:36px; height:5px; border-radius:3px; background:var(--line); overflow:hidden;}
+  .checklist-progress .bar-fill{height:100%; background:var(--later); border-radius:3px;}
+  .checklist{margin-top:8px; display:flex; flex-direction:column; gap:6px;}
+  .checklist-item{display:flex; align-items:center; gap:8px; font-size:.85rem;}
+  .checklist-item .mini-check{
+    flex:none; width:22px; height:22px; border-radius:7px; border:2px solid var(--line);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; background:#fff;
+    transition:transform .12s ease;
+  }
+  .checklist-item .mini-check:active{transform:scale(.9);}
+  .checklist-item.done span{color:var(--ink-soft); text-decoration:line-through;}
+
+  .sub-input-row{display:flex; gap:8px; margin-top:8px;}
+  .sub-input-row input{flex:1;}
+  .sub-input-row button{
+    flex:none; width:44px; min-height:44px; border-radius:10px; border:1px solid var(--line); background:#fff;
+    font-size:1.1rem; color:var(--ink); cursor:pointer;
+  }
+  .sub-list{margin-top:10px; display:flex; flex-direction:column; gap:6px;}
+  .sub-list-item{
+    display:flex; align-items:center; gap:8px; background:var(--bg); border-radius:10px; padding:7px 10px; font-size:.88rem;
+  }
+  .sub-list-item span{flex:1;}
+  .sub-list-item button{
+    flex:none; background:none; border:none; color:var(--overdue); cursor:pointer; font-size:.95rem;
+  }
+
+  .view-tabs{display:flex; gap:6px; background:var(--board); border:1px solid var(--line); border-radius:12px; padding:4px; margin-bottom:14px;}
+  .view-tab{
+    flex:1; border:none; background:transparent; padding:8px; border-radius:9px; font-family:'Assistant',sans-serif;
+    font-size:.88rem; font-weight:700; color:var(--ink-soft); cursor:pointer; min-height:40px;
+    transition:transform .12s ease;
+  }
+  .view-tab:active{transform:scale(.97);}
+  .view-tab.active{background:var(--ink); color:#fff;}
+
+  .day-section{margin-bottom:18px;}
+  .day-head{
+    display:flex; align-items:baseline; gap:8px; margin-bottom:8px; padding-bottom:6px;
+    border-bottom:2px solid var(--line);
+  }
+  .day-head .name{font-family:'Heebo',sans-serif; font-weight:800; font-size:1rem;}
+  .day-head .date{font-size:.8rem; color:var(--ink-soft);}
+  .day-head.is-today .name{color:var(--later);}
+  .day-head .day-count{margin-right:auto; font-size:.78rem; color:var(--ink-soft); font-weight:600;}
+  .day-empty{font-size:.82rem; color:var(--ink-soft); padding:2px 2px 4px;}
+
+  .eyebrow{font-size:.82rem; color:var(--ink-soft); font-weight:600; margin-bottom:2px;}
+  #todayHeading{font-size:1.7rem; font-weight:800;}
+  #todayDate{margin:2px 0 0; color:var(--ink-soft); font-size:.88rem;}
+
+  .avatar{
+    flex:none; width:34px; height:34px; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; font-size:1rem; align-self:center;
+  }
+  .card{}
+  .card.next-up{border-color:var(--card-accent, var(--later)); box-shadow:0 0 0 1.5px var(--card-accent, var(--later));}
+  .card-title-row{display:flex; align-items:baseline; gap:6px;}
+  .card-subtitle{font-size:.78rem; color:var(--ink-soft); margin-top:2px; display:flex; align-items:center; gap:5px; flex-wrap:wrap;}
+  .assignee-chip{
+    display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px;
+    border-radius:50%; font-size:.62rem; font-weight:800; color:#fff; flex:none;
+  }
+  .card-time{
+    flex:none; font-weight:800; font-size:1.05rem; color:var(--ink); text-align:left; min-width:44px;
+    display:flex; flex-direction:column; align-items:flex-start; gap:2px; align-self:center;
+  }
+  .card-time small{font-weight:600; font-size:.68rem; color:var(--ink-soft);}
+
+  .sync-error{
+    background:var(--overdue-bg); color:var(--overdue); border:1px solid var(--overdue);
+    border-radius:10px; padding:9px 12px; font-size:.82rem; font-weight:600; margin-bottom:12px;
+    cursor:pointer; text-align:center;
+  }
+  .completed-toggle{
+    display:flex; align-items:center; gap:6px; font-size:.85rem; font-weight:700; color:var(--ink-soft);
+    cursor:pointer; padding:10px 2px; border-top:1px solid var(--line); margin-top:6px;
+  }
+  .card.is-done{opacity:.6;}
+  .card.is-done .card-title{text-decoration:line-through; color:var(--ink-soft);}
+  .check.checked{background:var(--later); border-color:var(--later);}
+  .check.checked svg{opacity:1 !important;}
+
+  #backupText{
+    width:100%; min-height:110px; border:1px solid var(--line); border-radius:10px;
+    padding:10px 12px; font-family:monospace; font-size:.75rem; direction:ltr; text-align:left;
+    background:var(--bg); color:var(--ink);
+  }
+  .backup-actions{display:flex; gap:8px; margin-top:8px;}
+  .backup-actions .btn{flex:1; font-size:.85rem; padding:10px;}
+  .backup-note{font-size:.78rem; color:var(--ink-soft); margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="top-progress" id="topProgress"></div>
+<div class="wrap">
+  <header class="top">
+    <div class="top-row">
+      <div>
+        <div class="eyebrow">🏠 הבית שלנו</div>
+        <h1 id="todayHeading">יום</h1>
+        <p id="todayDate"></p>
+      </div>
+      <button type="button" id="openInfo" class="info-btn" title="מידע ואפשרויות">⋯</button>
+    </div>
+  </header>
+
+  <div class="view-tabs" id="viewTabs">
+    <button class="view-tab" data-view="list">רשימה</button>
+    <button class="view-tab active" data-view="week">לוז שבועי</button>
+  </div>
+  <div class="filters" id="filters"></div>
+  <div id="content" class="loading"><span class="spinner"></span> טוען משימות…</div>
+</div>
+
+<div class="overlay" id="infoOverlay">
+  <div class="modal">
+    <h2>מידע ואפשרויות</h2>
+    <p class="backup-note">🔗 הלוח משותף: כל מי שפותח את הקישור הזה רואה ומעדכן את אותן משימות</p>
+    <div class="modal-actions">
+      <button class="btn ghost" id="openBackupFromInfo">📤 גיבוי / ייבוא</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="closeInfoBtn">סגירה</button>
+    </div>
+  </div>
+</div>
+
+<button class="fab" id="openAdd">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  משימה חדשה
+</button>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">משימה חדשה</h2>
+    <label>שם המשימה</label>
+    <input type="text" id="fTitle" placeholder="למשל: לשטוף רצפות">
+
+    <label>קטגוריה</label>
+    <div class="seg" id="fCategory">
+      <button type="button" data-v="clean">ניקיון</button>
+      <button type="button" data-v="maint">תחזוקה</button>
+      <button type="button" data-v="doctor">תורי רופא</button>
+      <button type="button" data-v="other">אחר</button>
+    </div>
+
+    <label>מי מטפל במשימה (לא חובה)</label>
+    <div class="seg" id="fAssignees">
+      <button type="button" data-v="tamuz">תמוז</button>
+      <button type="button" data-v="udi">אודי</button>
+      <button type="button" data-v="eliad">אליעד</button>
+      <button type="button" data-v="oria">אוריה</button>
+      <button type="button" data-v="emuna">אמונה</button>
+    </div>
+
+    <div style="display:flex; gap:10px;">
+      <div style="flex:1;">
+        <label>תאריך יעד</label>
+        <input type="date" id="fDate">
+      </div>
+      <div style="flex:1;">
+        <label>שעה (לא חובה)</label>
+        <input type="time" id="fTime">
+      </div>
+    </div>
+
+    <label>חזרתיות</label>
+    <div class="seg" id="fRecur">
+      <button type="button" data-v="none">חד פעמי</button>
+      <button type="button" data-v="daily">יומי</button>
+      <button type="button" data-v="weekly">שבועי</button>
+      <button type="button" data-v="monthly">חודשי</button>
+      <button type="button" data-v="custom">מותאם</button>
+    </div>
+    <div class="custom-days" id="customDaysWrap" style="display:none;">
+      <span>כל</span><input type="number" id="fCustomDays" min="1" value="14"><span>ימים</span>
+    </div>
+
+    <label>הערות (לא חובה)</label>
+    <textarea id="fNotes" placeholder="פרטים נוספים…"></textarea>
+
+    <label>צ'ק ליסט (לא חובה)</label>
+    <div class="sub-input-row">
+      <input type="text" id="fSubInput" placeholder="למשל: לשטוף חלונות">
+      <button type="button" id="fSubAdd">+</button>
+    </div>
+    <div class="sub-list" id="fSubList"></div>
+
+    <div class="modal-actions">
+      <button class="btn ghost" id="cancelBtn">ביטול</button>
+      <button class="btn primary" id="saveBtn">שמירה</button>
+    </div>
+    <div class="modal-actions" id="deleteRow" style="display:none;">
+      <button class="btn danger" id="deleteBtn">מחיקת משימה</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="backupOverlay">
+  <div class="modal">
+    <h2>גיבוי וייבוא</h2>
+    <p class="backup-note">הלוח מסונכרן עם Google Sheets אוטומטית. הגיבוי הידני כאן הוא רק רשת ביטחון — למקרה שאין חיבור לאינטרנט או שרוצים להעביר עותק ידני.</p>
+
+    <label>ייצוא — העתיקו את הטקסט</label>
+    <textarea id="backupText" readonly></textarea>
+    <div class="backup-actions">
+      <button class="btn ghost" id="copyBackupBtn">העתקה</button>
+      <button class="btn ghost" id="shareBackupBtn">שיתוף</button>
+    </div>
+
+    <label>ייבוא — הדביקו טקסט גיבוי כאן</label>
+    <textarea id="restoreText" placeholder="הדביקו כאן טקסט שיוצא בעבר…"></textarea>
+    <div class="backup-actions">
+      <button class="btn primary" id="restoreBtn">ייבוא והחלפה</button>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn ghost" id="closeBackupBtn">סגירה</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span id="toastMsg"></span>
+  <button id="toastUndo" style="display:none;">בטל</button>
+</div>
+
+<script>
+const CAT = {
+  clean:  {label:'ניקיון',     color:'var(--cat-clean)'},
+  maint:  {label:'תחזוקה',     color:'var(--cat-maint)'},
+  doctor: {label:'תורי רופא',  color:'var(--cat-doctor)'},
+  other:  {label:'אחר',        color:'var(--cat-other)'},
+};
+const RECUR_LABEL = {none:'', daily:'כל יום', weekly:'כל שבוע', monthly:'כל חודש', custom:'ימים'};
+const CAT_EMOJI = {clean:'🧹', maint:'🔧', doctor:'🩺', other:'📌'};
+const FAMILY = {
+  tamuz:  {label:'תמוז',  color:'#EC4899'},
+  udi:    {label:'אודי',  color:'#3B82F6'},
+  eliad:  {label:'אליעד', color:'#10B981'},
+  oria:   {label:'אוריה', color:'#F59E0B'},
+  emuna:  {label:'אמונה', color:'#8B5CF6'},
+};
+let selectedAssignees = [];
+
+let tasks = [];
+let filter = 'all';
+let editingId = null;
+let lastDeleted = null;
+let lastToggledId = null;
+let toastTimer = null;
+let expandedIds = new Set();
+let currentChecklist = [];
+let viewMode = 'week';
+let completedExpanded = false;
+
+function todayStr(){
+  const d = new Date();
+  return d.toISOString().slice(0,10);
+}
+function addDays(dateStr, n){
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0,10);
+}
+function addMonths(dateStr, n){
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setMonth(d.getMonth() + n);
+  return d.toISOString().slice(0,10);
+}
+function daysBetween(a, b){
+  const d1 = new Date(a + 'T00:00:00');
+  const d2 = new Date(b + 'T00:00:00');
+  return Math.round((d2 - d1) / 86400000);
+}
+function formatDate(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('he-IL', {day:'numeric', month:'short'});
+}
+
+function renderTodayHeader(){
+  const d = new Date();
+  document.getElementById('todayHeading').textContent = 'היום';
+  document.getElementById('todayDate').textContent = 'יום ' + DAY_NAMES[d.getDay()] + ', ' + formatDate(todayStr());
+}
+
+// כתובת ה-Web App שמתקבלת אחרי Deploy ב-Apps Script (ראו apps-script-backend.gs).
+// אם עדיין לא הוגדרה, האפליקציה עובדת בזיכרון בלבד לשם בדיקה, ומזהירה על כך.
+const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbwe5rrZU13_WRq_NqAh7sASWWeak7DJ5dGAxB9h6dwgGt2vkPrToPGHE4ta2jtpR4h_Bw/exec';
+const SHEET_CONFIGURED = /^https:\/\//.test(SHEET_API_URL);
+
+let pendingRequests = 0;
+function beginProgress(){
+  pendingRequests++;
+  document.getElementById('topProgress').classList.add('active');
+}
+function endProgress(){
+  pendingRequests = Math.max(0, pendingRequests - 1);
+  if(pendingRequests === 0) document.getElementById('topProgress').classList.remove('active');
+}
+
+async function loadTasks(){
+  if(!SHEET_CONFIGURED){
+    tasks = [];
+    showSyncError('עדיין לא חובר לגיליון Google — הנתונים לא יישמרו. ראו את ההוראות שקיבלתם.');
+    render();
+    return;
+  }
+  beginProgress();
+  try{
+    const res = await fetch(SHEET_API_URL + '?action=data', {method:'GET'});
+    if(!res.ok) throw new Error('HTTP ' + res.status + ' מהשרת');
+    const data = await res.json();
+    if(!data || typeof data.value !== 'string') throw new Error('תשובה לא צפויה מהשרת (לא JSON תקין)');
+    tasks = data.value ? JSON.parse(data.value) : [];
+    hideSyncError();
+  }catch(e){
+    tasks = [];
+    showSyncError('טעינה מהגיליון נכשלה: ' + (e && e.message ? e.message : e) + ' — לחצו לניסיון חוזר');
+  }finally{
+    endProgress();
+  }
+  render();
+}
+async function saveTasks(retries){
+  if(!SHEET_CONFIGURED){
+    showSyncError('עדיין לא חובר לגיליון Google — הנתונים לא יישמרו. ראו את ההוראות שקיבלתם.');
+    return false;
+  }
+  retries = retries === undefined ? 2 : retries;
+  beginProgress();
+  try{
+    const res = await fetch(SHEET_API_URL, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'}, // text/plain avoids a CORS preflight against Apps Script
+      body: JSON.stringify(tasks),
+    });
+    if(!res.ok) throw new Error('HTTP ' + res.status + ' מהשרת');
+    const data = await res.json().catch(()=>null);
+    if(!data || data.ok !== true) throw new Error('השרת לא אישר שמירה (יתכן שהבקשה הופנתה מחדש ואיבדה את הנתונים)');
+    hideSyncError();
+    return true;
+  }catch(e){
+    if(retries > 0){
+      await new Promise(r => setTimeout(r, 400));
+      endProgress();
+      return saveTasks(retries - 1);
+    }
+    showSyncError('השמירה לגיליון נכשלה: ' + (e && e.message ? e.message : 'שגיאה לא ידועה') + ' — לחצו לניסיון חוזר');
+    return false;
+  }finally{
+    endProgress();
+  }
+}
+
+function showSyncError(msg){
+  let banner = document.getElementById('syncError');
+  if(!banner){
+    banner = document.createElement('div');
+    banner.id = 'syncError';
+    banner.className = 'sync-error';
+    document.querySelector('.wrap').insertBefore(banner, document.getElementById('viewTabs'));
+  }
+  banner.textContent = msg;
+  banner.onclick = async ()=>{ banner.textContent = 'שומר מחדש…'; await loadTasks(); };
+}
+function hideSyncError(){
+  const banner = document.getElementById('syncError');
+  if(banner) banner.remove();
+}
+
+function showToast(msg, withUndo){
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  const undoBtn = document.getElementById('toastUndo');
+  undoBtn.style.display = withUndo ? 'inline' : 'none';
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('show'), 4000);
+}
+
+function renderFilters(){
+  const el = document.getElementById('filters');
+  const opts = [['all','הכל'], ['clean','ניקיון'], ['maint','תחזוקה'], ['doctor','תורי רופא'], ['other','אחר']];
+  el.innerHTML = opts.map(([v,l]) =>
+    `<button class="chip ${filter===v?'active':''}" data-v="${v}">${l}</button>`
+  ).join('');
+  el.querySelectorAll('.chip').forEach(btn=>{
+    btn.onclick = ()=>{ filter = btn.dataset.v; render(); };
+  });
+}
+
+function classify(task){
+  const diff = daysBetween(todayStr(), task.dueDate);
+  if(diff < 0) return 'overdue';
+  if(diff === 0) return 'today';
+  if(diff <= 7) return 'week';
+  return 'later';
+}
+
+function render(){
+  renderFilters();
+  if(viewMode === 'week') renderWeekView();
+  else renderListView();
+}
+
+const DAY_NAMES = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+
+function renderCompletedSection(list){
+  if(!list.length) return '';
+  const sorted = list.slice().sort((a,b)=> (b.completedAt||'').localeCompare(a.completedAt||'')).slice(0, 20);
+  return `
+    <div class="completed-toggle" data-toggle-completed>
+      <span>✓ הושלמו לאחרונה (${sorted.length})</span>
+      <span>${completedExpanded ? '▲' : '▼'}</span>
+    </div>
+    ${completedExpanded ? sorted.map(t => renderCard(t, {})).join('') : ''}
+  `;
+}
+
+function renderWeekView(){
+  const content = document.getElementById('content');
+  const visible = tasks.filter(t => filter === 'all' || t.category === filter);
+  const active = visible.filter(t => !t.done);
+  const done = visible.filter(t => t.done);
+
+  if(tasks.length === 0){
+    content.innerHTML = `
+      <div class="empty">
+        <h3>אין משימות כרגע</h3>
+        <p>הוסיפו את המשימה הראשונה — ניקיון, תחזוקה או תור לרופא</p>
+      </div>`;
+    return;
+  }
+
+  const today = todayStr();
+  const nextUpId = findNextUpId(active);
+  const overdue = active.filter(t => daysBetween(today, t.dueDate) < 0)
+    .sort((a,b)=> (a.dueDate+(a.time||'')).localeCompare(b.dueDate+(b.time||'')));
+
+  let html = '';
+  if(overdue.length){
+    html += `<section class="day-section">
+      <div class="day-head">
+        <span class="name" style="color:var(--overdue)">באיחור</span>
+        <span class="day-count">${overdue.length}</span>
+      </div>
+      ${overdue.map(t => renderCard(t, {isNextUp: t.id === nextUpId})).join('')}
+    </section>`;
+  }
+
+  for(let i=0; i<7; i++){
+    const date = addDays(today, i);
+    const dayTasks = active.filter(t => t.dueDate === date)
+      .sort((a,b)=> (a.time || '99:99').localeCompare(b.time || '99:99') || a.title.localeCompare(b.title, 'he'));
+    const d = new Date(date + 'T00:00:00');
+    const isToday = i === 0;
+    html += `<section class="day-section">
+      <div class="day-head ${isToday ? 'is-today' : ''}">
+        <span class="name">${isToday ? 'היום · ' : ''}${DAY_NAMES[d.getDay()]}</span>
+        <span class="date">${formatDate(date)}</span>
+        ${dayTasks.length ? `<span class="day-count">${dayTasks.length}</span>` : ''}
+      </div>
+      ${dayTasks.length ? dayTasks.map(t => renderCard(t, {isNextUp: t.id === nextUpId})).join('') : '<div class="day-empty">אין משימות ליום הזה</div>'}
+    </section>`;
+  }
+  html += renderCompletedSection(done);
+  content.innerHTML = html;
+  wireCardEvents(content);
+}
+
+function renderListView(){
+  const content = document.getElementById('content');
+  const visible = tasks.filter(t => filter === 'all' || t.category === filter);
+  const active = visible.filter(t => !t.done);
+  const done = visible.filter(t => t.done);
+
+  if(visible.length === 0){
+    content.innerHTML = `
+      <div class="empty">
+        <h3>אין משימות כרגע</h3>
+        <p>הוסיפו את המשימה הראשונה — ניקיון, תחזוקה או תור לרופא</p>
+      </div>`;
+    return;
+  }
+
+  const groups = {overdue:[], today:[], week:[], later:[]};
+  active.forEach(t => groups[classify(t)].push(t));
+  Object.values(groups).forEach(g => g.sort((a,b)=> (a.dueDate+(a.time||'')).localeCompare(b.dueDate+(b.time||''))));
+  const nextUpId = findNextUpId(active);
+
+  const groupMeta = {
+    overdue: {title:'באיחור', color:'var(--overdue)'},
+    today:   {title:'היום', color:'var(--today)'},
+    week:    {title:'השבוע הקרוב', color:'var(--week)'},
+    later:   {title:'בהמשך', color:'var(--later)'},
+  };
+
+  let html = '';
+  if(active.length === 0){
+    html += `<div class="day-empty">אין משימות פעילות כרגע</div>`;
+  }
+  ['overdue','today','week','later'].forEach(key=>{
+    const list = groups[key];
+    if(list.length === 0) return;
+    const meta = groupMeta[key];
+    html += `<section class="group">
+      <div class="group-head">
+        <span class="dot" style="background:${meta.color}"></span>
+        <h2>${meta.title}</h2>
+        <span class="count">(${list.length})</span>
+      </div>
+      ${list.map(t => renderCard(t, {isNextUp: t.id === nextUpId})).join('')}
+    </section>`;
+  });
+  html += renderCompletedSection(done);
+  content.innerHTML = html;
+  wireCardEvents(content);
+}
+
+const busyTaskIds = new Set();
+function wireCardEvents(content){
+  content.querySelectorAll('[data-check]').forEach(el=>{
+    el.onclick = async ()=>{
+      const id = el.dataset.check;
+      if(busyTaskIds.has(id)) return;
+      busyTaskIds.add(id);
+      try{ await completeTask(id); }
+      finally{ busyTaskIds.delete(id); }
+    };
+  });
+  content.querySelectorAll('[data-toggle-completed]').forEach(el=>{
+    el.onclick = ()=>{ completedExpanded = !completedExpanded; render(); };
+  });
+  content.querySelectorAll('[data-edit]').forEach(el=>{
+    el.onclick = ()=> openEdit(el.dataset.edit);
+  });
+  content.querySelectorAll('[data-toggle-list]').forEach(el=>{
+    el.onclick = ()=>{
+      const id = el.dataset.toggleList;
+      if(expandedIds.has(id)) expandedIds.delete(id); else expandedIds.add(id);
+      render();
+    };
+  });
+  content.querySelectorAll('[data-sub-toggle]').forEach(el=>{
+    el.onclick = async ()=>{
+      const [taskId, subId] = el.dataset.subToggle.split('|');
+      const t = tasks.find(x => x.id === taskId);
+      if(!t) return;
+      const item = (t.checklist || []).find(c => c.id === subId);
+      if(!item) return;
+      item.done = !item.done;
+      await saveTasks();
+      render();
+    };
+  });
+}
+
+function findNextUpId(list){
+  const upcoming = list.filter(t => daysBetween(todayStr(), t.dueDate) >= 0);
+  if(upcoming.length === 0) return null;
+  upcoming.sort((a,b)=>{
+    const ka = a.dueDate + ' ' + (a.time || '23:59');
+    const kb = b.dueDate + ' ' + (b.time || '23:59');
+    return ka.localeCompare(kb);
+  });
+  return upcoming[0].id;
+}
+
+function timeDisplay(t){
+  const diff = daysBetween(todayStr(), t.dueDate);
+  let big, small, color;
+  if(diff < 0){
+    big = 'באיחור';
+    small = t.time ? `${t.time} · לפני ${Math.abs(diff)} ימים` : `לפני ${Math.abs(diff)} ימים`;
+    color = 'var(--overdue)';
+  } else if(diff === 0){
+    big = 'היום'; small = t.time || ''; color = 'var(--today)';
+  } else if(diff === 1){
+    big = 'מחר'; small = t.time || ''; color = 'var(--today)';
+  } else if(diff <= 6){
+    const d = new Date(t.dueDate + 'T00:00:00');
+    big = 'יום ' + DAY_NAMES[d.getDay()];
+    small = t.time || formatDate(t.dueDate);
+    color = 'var(--week)';
+  } else {
+    big = formatDate(t.dueDate); small = t.time || ''; color = 'var(--later)';
+  }
+  return {big, small, color};
+}
+
+function renderCard(t, opts){
+  opts = opts || {};
+  const cat = CAT[t.category];
+  const emoji = CAT_EMOJI[t.category];
+
+  let recurText = '';
+  if(t.recurrence.type !== 'none'){
+    recurText = t.recurrence.type === 'custom'
+      ? `כל ${t.recurrence.days} ימים`
+      : RECUR_LABEL[t.recurrence.type];
+  }
+
+  const checklist = t.checklist || [];
+  const hasChecklist = checklist.length > 0;
+  const doneCount = checklist.filter(c => c.done).length;
+  const isExpanded = expandedIds.has(t.id);
+  const progressPct = hasChecklist ? Math.round((doneCount / checklist.length) * 100) : 0;
+  const tm = timeDisplay(t);
+
+  return `
+  <div class="card ${opts.isNextUp ? 'next-up' : ''} ${t.done ? 'is-done' : ''}" style="--card-accent:${cat.color}">
+    <div class="check ${t.done ? 'checked' : ''}" data-check="${t.id}">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${t.done ? '#fff' : 'var(--later)'}" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="avatar" style="background:${cat.color}22">${emoji}</div>
+    <div class="card-body">
+      <div class="card-title">${escapeHtml(t.title)}</div>
+      <div class="card-subtitle">
+        ${cat.label}${recurText ? ' · ↻ ' + recurText : ''}
+        ${(t.assignees || []).map(a => FAMILY[a] ? `<span class="assignee-chip" style="background:${FAMILY[a].color}" title="${FAMILY[a].label}">${FAMILY[a].label[0]}</span>` : '').join('')}
+      </div>
+      <div class="card-meta">
+        ${hasChecklist ? `
+          <span class="checklist-progress" data-toggle-list="${t.id}">
+            <span class="bar"><span class="bar-fill" style="width:${progressPct}%"></span></span>
+            ${doneCount}/${checklist.length} ${isExpanded ? '▲' : '▼'}
+          </span>` : ''}
+      </div>
+      ${t.notes ? `<div class="card-notes">${escapeHtml(t.notes)}</div>` : ''}
+      ${hasChecklist && isExpanded ? `
+        <div class="checklist">
+          ${checklist.map(c => `
+            <div class="checklist-item ${c.done ? 'done' : ''}">
+              <span class="mini-check" data-sub-toggle="${t.id}|${c.id}">
+                ${c.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--later)" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+              </span>
+              <span>${escapeHtml(c.text)}</span>
+            </div>`).join('')}
+        </div>` : ''}
+    </div>
+    <div class="card-time" style="color:${tm.color}">
+      ${tm.big}
+      ${tm.small ? `<small>${tm.small}</small>` : ''}
+    </div>
+    <div class="card-actions">
+      <button class="icon-btn" data-edit="${t.id}" title="עריכה">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
+    </div>
+  </div>`;
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// Wraps a button's click handler so a fast double-tap can't run it twice
+// (e.g. creating the same task twice). The button is visually disabled
+// for the duration of the async handler and re-enabled afterward.
+function guardClick(btn, handler){
+  let busy = false;
+  btn.onclick = async (...args)=>{
+    if(busy) return;
+    busy = true;
+    const prevOpacity = btn.style.opacity;
+    btn.style.pointerEvents = 'none';
+    btn.style.opacity = '.6';
+    try{
+      await handler(...args);
+    } finally {
+      busy = false;
+      btn.style.pointerEvents = '';
+      btn.style.opacity = prevOpacity;
+    }
+  };
+}
+
+async function completeTask(id){
+  const t = tasks.find(t => t.id === id);
+  if(!t) return;
+
+  if(t.recurrence.type === 'none'){
+    if(t.done){
+      // was already done — tapping again reverts it back to active
+      t.done = false;
+      t.completedAt = null;
+      await saveTasks();
+      render();
+      return;
+    }
+    t.done = true;
+    t.completedAt = new Date().toISOString();
+    lastToggledId = id;
+    showToast('המשימה הושלמה', true);
+  } else {
+    let next;
+    const base = todayStr();
+    if(t.recurrence.type === 'daily') next = addDays(base, 1);
+    else if(t.recurrence.type === 'weekly') next = addDays(base, 7);
+    else if(t.recurrence.type === 'monthly') next = addMonths(base, 1);
+    else next = addDays(base, t.recurrence.days || 14);
+    t.dueDate = next;
+    if(t.checklist && t.checklist.length){
+      t.checklist.forEach(c => c.done = false);
+      expandedIds.delete(t.id);
+    }
+    showToast('בוצע — נקבע תאריך הבא: ' + formatDate(next));
+  }
+  await saveTasks();
+  render();
+
+  document.getElementById('toastUndo').onclick = async ()=>{
+    if(lastToggledId){
+      const rt = tasks.find(x => x.id === lastToggledId);
+      if(rt){ rt.done = false; rt.completedAt = null; }
+      lastToggledId = null;
+      await saveTasks();
+      render();
+      document.getElementById('toast').classList.remove('show');
+    }
+  };
+}
+
+// ---- Modal ----
+const overlay = document.getElementById('overlay');
+let selectedCategory = 'clean';
+let selectedRecur = 'none';
+
+function openAdd(){
+  editingId = null;
+  document.getElementById('modalTitle').textContent = 'משימה חדשה';
+  document.getElementById('fTitle').value = '';
+  document.getElementById('fDate').value = todayStr();
+  document.getElementById('fTime').value = '';
+  document.getElementById('fNotes').value = '';
+  document.getElementById('fCustomDays').value = 14;
+  document.getElementById('deleteRow').style.display = 'none';
+  selectedCategory = 'clean';
+  selectedRecur = 'none';
+  selectedAssignees = [];
+  currentChecklist = [];
+  renderSubList();
+  updateSegUI();
+  overlay.classList.add('show');
+}
+
+function openEdit(id){
+  const t = tasks.find(x => x.id === id);
+  if(!t) return;
+  editingId = id;
+  document.getElementById('modalTitle').textContent = 'עריכת משימה';
+  document.getElementById('fTitle').value = t.title;
+  document.getElementById('fDate').value = t.dueDate;
+  document.getElementById('fTime').value = t.time || '';
+  document.getElementById('fNotes').value = t.notes || '';
+  selectedCategory = t.category;
+  selectedRecur = t.recurrence.type;
+  selectedAssignees = (t.assignees || []).slice();
+  document.getElementById('fCustomDays').value = t.recurrence.days || 14;
+  document.getElementById('deleteRow').style.display = 'flex';
+  currentChecklist = (t.checklist || []).map(c => ({...c}));
+  renderSubList();
+  updateSegUI();
+  overlay.classList.add('show');
+}
+
+function renderSubList(){
+  const el = document.getElementById('fSubList');
+  el.innerHTML = currentChecklist.map(c => `
+    <div class="sub-list-item">
+      <span>${escapeHtml(c.text)}</span>
+      <button type="button" data-remove-sub="${c.id}">✕</button>
+    </div>`).join('');
+  el.querySelectorAll('[data-remove-sub]').forEach(btn=>{
+    btn.onclick = ()=>{
+      currentChecklist = currentChecklist.filter(c => c.id !== btn.dataset.removeSub);
+      renderSubList();
+    };
+  });
+}
+
+function addSubItem(){
+  const input = document.getElementById('fSubInput');
+  const text = input.value.trim();
+  if(!text) return;
+  currentChecklist.push({id: 'sub_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), text, done:false});
+  input.value = '';
+  renderSubList();
+  input.focus();
+}
+
+document.getElementById('fSubAdd').onclick = addSubItem;
+document.getElementById('fSubInput').addEventListener('keydown', e=>{
+  if(e.key === 'Enter'){ e.preventDefault(); addSubItem(); }
+});
+
+function updateSegUI(){
+  document.querySelectorAll('#fCategory button').forEach(b=>{
+    const active = b.dataset.v === selectedCategory;
+    b.classList.toggle('active', active);
+    b.style.background = active ? CAT[b.dataset.v].color : '';
+    b.style.borderColor = active ? CAT[b.dataset.v].color : '';
+  });
+  document.querySelectorAll('#fRecur button').forEach(b=>{
+    const active = b.dataset.v === selectedRecur;
+    b.classList.toggle('active', active);
+    b.style.background = active ? 'var(--ink)' : '';
+  });
+  document.getElementById('customDaysWrap').style.display = selectedRecur === 'custom' ? 'flex' : 'none';
+  document.querySelectorAll('#fAssignees button').forEach(b=>{
+    const active = selectedAssignees.includes(b.dataset.v);
+    b.classList.toggle('active', active);
+    b.style.background = active ? FAMILY[b.dataset.v].color : '';
+    b.style.borderColor = active ? FAMILY[b.dataset.v].color : '';
+    b.style.color = active ? '#fff' : '';
+  });
+}
+
+document.getElementById('fCategory').addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  selectedCategory = btn.dataset.v; updateSegUI();
+});
+document.getElementById('fRecur').addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  selectedRecur = btn.dataset.v; updateSegUI();
+});
+document.getElementById('fAssignees').addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  const v = btn.dataset.v;
+  if(selectedAssignees.includes(v)) selectedAssignees = selectedAssignees.filter(x => x !== v);
+  else selectedAssignees.push(v);
+  updateSegUI();
+});
+
+document.getElementById('openAdd').onclick = openAdd;
+document.getElementById('cancelBtn').onclick = ()=> overlay.classList.remove('show');
+overlay.onclick = (e)=>{ if(e.target === overlay) overlay.classList.remove('show'); };
+
+guardClick(document.getElementById('saveBtn'), async ()=>{
+  const title = document.getElementById('fTitle').value.trim();
+  const dueDate = document.getElementById('fDate').value;
+  const time = document.getElementById('fTime').value || null;
+  if(!title){ showToast('נא להזין שם למשימה'); return; }
+  if(!dueDate){ showToast('נא לבחור תאריך'); return; }
+
+  const recurrence = { type: selectedRecur };
+  if(selectedRecur === 'custom'){
+    recurrence.days = parseInt(document.getElementById('fCustomDays').value, 10) || 14;
+  }
+
+  if(editingId){
+    const t = tasks.find(x => x.id === editingId);
+    t.title = title; t.category = selectedCategory; t.dueDate = dueDate; t.time = time;
+    t.notes = document.getElementById('fNotes').value.trim();
+    t.recurrence = recurrence;
+    t.checklist = currentChecklist;
+    t.assignees = selectedAssignees.slice();
+  } else {
+    tasks.push({
+      id: 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      title, category: selectedCategory, dueDate, time,
+      notes: document.getElementById('fNotes').value.trim(),
+      recurrence,
+      checklist: currentChecklist,
+      assignees: selectedAssignees.slice(),
+      done: false,
+      completedAt: null,
+    });
+  }
+  await saveTasks();
+  overlay.classList.remove('show');
+  render();
+});
+
+guardClick(document.getElementById('deleteBtn'), async ()=>{
+  const idx = tasks.findIndex(t => t.id === editingId);
+  if(idx !== -1){
+    lastDeleted = {task: {...tasks[idx]}, index: idx};
+    tasks.splice(idx, 1);
+    await saveTasks();
+    overlay.classList.remove('show');
+    render();
+    showToast('המשימה נמחקה', true);
+    document.getElementById('toastUndo').onclick = async ()=>{
+      if(lastDeleted){
+        tasks.splice(lastDeleted.index, 0, lastDeleted.task);
+        lastDeleted = null;
+        await saveTasks();
+        render();
+        document.getElementById('toast').classList.remove('show');
+      }
+    };
+  }
+});
+
+// ---- Info menu (shared-note + entry point to backup/restore) ----
+const infoOverlay = document.getElementById('infoOverlay');
+document.getElementById('openInfo').onclick = ()=> infoOverlay.classList.add('show');
+document.getElementById('closeInfoBtn').onclick = ()=> infoOverlay.classList.remove('show');
+infoOverlay.onclick = (e)=>{ if(e.target === infoOverlay) infoOverlay.classList.remove('show'); };
+
+// ---- Backup / Restore (manual, since automatic storage may be unavailable here) ----
+const backupOverlay = document.getElementById('backupOverlay');
+document.getElementById('openBackupFromInfo').onclick = ()=>{
+  infoOverlay.classList.remove('show');
+  document.getElementById('backupText').value = JSON.stringify(tasks);
+  document.getElementById('restoreText').value = '';
+  backupOverlay.classList.add('show');
+};
+document.getElementById('closeBackupBtn').onclick = ()=> backupOverlay.classList.remove('show');
+backupOverlay.onclick = (e)=>{ if(e.target === backupOverlay) backupOverlay.classList.remove('show'); };
+
+document.getElementById('copyBackupBtn').onclick = async ()=>{
+  const text = document.getElementById('backupText').value;
+  try{
+    await navigator.clipboard.writeText(text);
+    showToast('הועתק');
+  }catch(e){
+    document.getElementById('backupText').select();
+    showToast('סמנו והעתיקו ידנית');
+  }
+};
+document.getElementById('shareBackupBtn').onclick = async ()=>{
+  const text = document.getElementById('backupText').value;
+  if(navigator.share){
+    try{ await navigator.share({title:'גיבוי משימות הבית', text}); }
+    catch(e){ /* user cancelled share — ignore */ }
+  } else {
+    document.getElementById('backupText').select();
+    showToast('סמנו והעתיקו ידנית');
+  }
+};
+guardClick(document.getElementById('restoreBtn'), async ()=>{
+  const raw = document.getElementById('restoreText').value.trim();
+  if(!raw){ showToast('הדביקו טקסט גיבוי קודם'); return; }
+  let parsed;
+  try{ parsed = JSON.parse(raw); }
+  catch(e){ showToast('הטקסט לא תקין — ודאו שהעתקתם הכל'); return; }
+  if(!Array.isArray(parsed)){ showToast('הטקסט לא תקין'); return; }
+  tasks = parsed;
+  await saveTasks();
+  backupOverlay.classList.remove('show');
+  render();
+  showToast('הנתונים יובאו בהצלחה');
+});
+
+document.querySelectorAll('.view-tab').forEach(btn=>{
+  btn.onclick = ()=>{
+    viewMode = btn.dataset.view;
+    document.querySelectorAll('.view-tab').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  };
+});
+
+renderTodayHeader();
+loadTasks();
+</script>
+</body>
+</html>
