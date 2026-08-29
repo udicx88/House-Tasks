@@ -48,10 +48,22 @@
   header.top h1{font-size:1.5rem; font-weight:800; letter-spacing:-0.01em;}
   header.top p{margin:4px 0 0; color:var(--ink-soft); font-size:.9rem;}
   .top-row{display:flex; align-items:flex-start; justify-content:space-between; gap:10px;}
+  .top-row-actions{display:flex; align-items:center; gap:8px;}
   .info-btn{
     flex:none; width:36px; height:36px; border-radius:50%; border:1px solid var(--line);
     background:var(--board); color:var(--ink-soft); font-size:1.2rem; font-weight:800;
     cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:0;
+  }
+  .save-status{
+    font-size:.72rem; font-weight:700; color:var(--ink-soft); display:inline-flex;
+    align-items:center; gap:5px; white-space:nowrap; min-height:20px; transition:opacity .2s ease;
+  }
+  .save-status.state-saved{color:var(--later);}
+  .save-status.state-pending{color:var(--today);}
+  .save-status.state-saving{color:var(--week);}
+  .spinner-mini{
+    width:11px; height:11px; border-radius:50%; border:2px solid var(--line);
+    border-top-color:var(--week); animation:spin .7s linear infinite; display:inline-block;
   }
   .filters{display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:18px;}
   .filters::-webkit-scrollbar{display:none;}
@@ -249,6 +261,48 @@
     min-height:26px; transition:transform .12s ease;
   }
   .week-nav-today:active{transform:scale(.94);}
+
+  .layout-toggle{display:flex; gap:6px; margin-bottom:16px;}
+  .layout-btn{
+    flex:1; border:1px solid var(--line); background:var(--board); color:var(--ink-soft);
+    font-family:'Assistant',sans-serif; font-size:.82rem; font-weight:700; padding:8px; border-radius:10px;
+    cursor:pointer; min-height:38px; transition:transform .12s ease;
+  }
+  .layout-btn:active{transform:scale(.97);}
+  .layout-btn.active{background:var(--ink); color:#fff; border-color:var(--ink);}
+
+  .week-columns{
+    display:flex; gap:8px; overflow-x:auto; padding-bottom:8px;
+    scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch;
+  }
+  .week-columns::-webkit-scrollbar{height:5px;}
+  .week-columns::-webkit-scrollbar-thumb{background:var(--line); border-radius:3px;}
+  .week-col{
+    flex:0 0 132px; scroll-snap-align:start; background:var(--board); border:1px solid var(--line);
+    border-radius:14px; box-shadow:var(--shadow-1); display:flex; flex-direction:column;
+    max-height:calc(100vh - 260px); min-height:160px;
+  }
+  .week-col-head{
+    padding:10px 6px; text-align:center; border-bottom:1px solid var(--line);
+    border-radius:14px 14px 0 0; flex:none;
+  }
+  .week-col-head.is-today{background:var(--later-bg);}
+  .wc-day{font-weight:800; font-size:.82rem; font-family:'Heebo',sans-serif;}
+  .wc-date{font-size:.7rem; color:var(--ink-soft); margin-top:2px;}
+  .week-col-body{padding:8px 6px; display:flex; flex-direction:column; gap:6px; overflow-y:auto; flex:1;}
+  .wc-empty{text-align:center; color:var(--ink-soft); font-size:.78rem; padding:8px 0;}
+  .wc-task{
+    background:var(--bg); border-radius:9px; padding:6px 7px; cursor:pointer;
+    border-right:3px solid; display:flex; flex-direction:column; gap:2px;
+    transition:transform .12s ease;
+  }
+  .wc-task:active{transform:scale(.96);}
+  .wc-task.wc-next{box-shadow:0 0 0 1.5px var(--later);}
+  .wc-task.wc-done{opacity:.55;}
+  .wc-task.wc-done .wc-title{text-decoration:line-through;}
+  .wc-emoji{font-size:.85rem;}
+  .wc-title{font-size:.74rem; font-weight:600; line-height:1.25; word-break:break-word;}
+  .wc-time{font-size:.68rem; color:var(--ink-soft); font-weight:700;}
   .day-head{
     display:flex; align-items:baseline; gap:8px; margin-bottom:8px; padding-bottom:6px;
     border-bottom:2px solid var(--line);
@@ -315,7 +369,10 @@
         <h1 id="todayHeading">יום</h1>
         <p id="todayDate"></p>
       </div>
-      <button type="button" id="openInfo" class="info-btn" title="מידע ואפשרויות">⋯</button>
+      <div class="top-row-actions">
+        <span id="saveStatus" class="save-status"></span>
+        <button type="button" id="openInfo" class="info-btn" title="מידע ואפשרויות">⋯</button>
+      </div>
     </div>
   </header>
 
@@ -468,6 +525,7 @@ let expandedIds = new Set();
 let currentChecklist = [];
 let viewMode = 'week';
 let currentWeekStart = startOfWeek(todayStr());
+let weekLayout = 'agenda';
 let completedExpanded = false;
 
 function todayStr(){
@@ -518,7 +576,7 @@ function endProgress(){
 async function loadTasks(){
   if(!SHEET_CONFIGURED){
     tasks = [];
-    showSyncError('עדיין לא חובר לגיליון Google — הנתונים לא יישמרו. ראו את ההוראות שקיבלתם.');
+    showSyncError('עדיין לא חובר לגיליון Google — הנתונים לא יישמרו. ראו את ההוראות שקיבלתם.', loadTasks);
     render();
     return;
   }
@@ -532,18 +590,52 @@ async function loadTasks(){
     hideSyncError();
   }catch(e){
     tasks = [];
-    showSyncError('טעינה מהגיליון נכשלה: ' + (e && e.message ? e.message : e) + ' — לחצו לניסיון חוזר');
+    showSyncError('טעינה מהגיליון נכשלה: ' + (e && e.message ? e.message : e) + ' — לחצו לניסיון חוזר', loadTasks);
   }finally{
     endProgress();
   }
   render();
 }
-async function saveTasks(retries){
+
+// ---- Background save queue ----
+// Best-practice pattern: local state updates instantly (optimistic UI) and
+// callers never block on the network. Writes are debounced (so rapid
+// successive actions collapse into one request), and failures retry
+// automatically in the background with exponential backoff, so a flaky
+// connection self-heals without the person needing to do anything.
+let dirty = false;
+let saveInFlight = false;
+let saveDebounceTimer = null;
+let bgRetryTimer = null;
+let bgRetryDelay = 3000;
+
+function setSaveStatus(state){
+  const el = document.getElementById('saveStatus');
+  if(!el) return;
+  clearTimeout(setSaveStatus._t);
+  if(state === 'saving'){
+    el.innerHTML = '<span class="spinner-mini"></span> שומר…';
+    el.className = 'save-status state-saving';
+  } else if(state === 'pending'){
+    el.textContent = 'ממתין לשמירה…';
+    el.className = 'save-status state-pending';
+  } else if(state === 'saved'){
+    el.textContent = '✓ נשמר';
+    el.className = 'save-status state-saved';
+    setSaveStatus._t = setTimeout(()=>{
+      if(el.className === 'save-status state-saved'){ el.textContent = ''; el.className = 'save-status'; }
+    }, 2000);
+  } else {
+    el.textContent = '';
+    el.className = 'save-status';
+  }
+}
+
+async function performSave(){
   if(!SHEET_CONFIGURED){
-    showSyncError('עדיין לא חובר לגיליון Google — הנתונים לא יישמרו. ראו את ההוראות שקיבלתם.');
+    showSyncError('עדיין לא חובר לגיליון Google — הנתונים לא יישמרו. ראו את ההוראות שקיבלתם.', flushSave);
     return false;
   }
-  retries = retries === undefined ? 2 : retries;
   beginProgress();
   try{
     const res = await fetch(SHEET_API_URL, {
@@ -557,19 +649,60 @@ async function saveTasks(retries){
     hideSyncError();
     return true;
   }catch(e){
-    if(retries > 0){
-      await new Promise(r => setTimeout(r, 400));
-      endProgress();
-      return saveTasks(retries - 1);
-    }
-    showSyncError('השמירה לגיליון נכשלה: ' + (e && e.message ? e.message : 'שגיאה לא ידועה') + ' — לחצו לניסיון חוזר');
+    showSyncError('השמירה נכשלה, מנסה שוב ברקע… (' + (e && e.message ? e.message : 'שגיאה לא ידועה') + ') — לחצו לניסיון מיידי', flushSave);
     return false;
   }finally{
     endProgress();
   }
 }
 
-function showSyncError(msg){
+async function flushSave(){
+  if(saveInFlight || !dirty) return;
+  clearTimeout(bgRetryTimer);
+  saveInFlight = true;
+  dirty = false;
+  setSaveStatus('saving');
+  const ok = await performSave();
+  saveInFlight = false;
+  if(ok){
+    bgRetryDelay = 3000;
+    setSaveStatus('saved');
+    if(dirty) scheduleFlush(200); // something changed again mid-save — flush that too
+  } else {
+    dirty = true; // still unsaved — keep retrying in the background
+    bgRetryTimer = setTimeout(flushSave, bgRetryDelay);
+    bgRetryDelay = Math.min(bgRetryDelay * 2, 30000);
+  }
+}
+
+function scheduleFlush(delay){
+  clearTimeout(saveDebounceTimer);
+  saveDebounceTimer = setTimeout(flushSave, delay === undefined ? 450 : delay);
+}
+
+// Public API — kept the same name/shape as before so every existing call
+// site keeps working unchanged. Marks data dirty and queues a debounced
+// background save, then resolves immediately: callers proceed right away
+// (close the modal, re-render) instead of waiting on a network round-trip.
+async function saveTasks(){
+  dirty = true;
+  setSaveStatus('pending');
+  scheduleFlush(450);
+  return true;
+}
+
+// Warn before leaving if there's anything not yet confirmed saved — this is
+// the safety net in place of local-draft storage (which this environment
+// doesn't support): it stops an accidental tab close from silently losing
+// the most recent edits while a save is still pending or in flight.
+window.addEventListener('beforeunload', (e)=>{
+  if(dirty || saveInFlight){
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+function showSyncError(msg, retryFn){
   let banner = document.getElementById('syncError');
   if(!banner){
     banner = document.createElement('div');
@@ -578,7 +711,11 @@ function showSyncError(msg){
     document.querySelector('.wrap').insertBefore(banner, document.getElementById('viewTabs'));
   }
   banner.textContent = msg;
-  banner.onclick = async ()=>{ banner.textContent = 'שומר מחדש…'; await loadTasks(); };
+  banner.onclick = async ()=>{
+    banner.textContent = 'מנסה שוב…';
+    if(retryFn) await retryFn();
+    else await loadTasks();
+  };
 }
 function hideSyncError(){
   const banner = document.getElementById('syncError');
@@ -657,7 +794,45 @@ function renderWeekNav(weekStart){
       <button type="button" class="week-nav-arrow" data-week-next title="שבוע הבא">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
+    </div>
+    <div class="layout-toggle">
+      <button type="button" class="layout-btn ${weekLayout === 'agenda' ? 'active' : ''}" data-layout="agenda">אג'נדה</button>
+      <button type="button" class="layout-btn ${weekLayout === 'columns' ? 'active' : ''}" data-layout="columns">עמודות</button>
     </div>`;
+}
+
+function renderWeekColumns(weekStart, active, nextUpId, isCurrentWeek){
+  const today = todayStr();
+  let cols = '';
+  for(let i=0; i<7; i++){
+    const date = addDays(weekStart, i);
+    const dayTasks = active.filter(t => t.dueDate === date)
+      .sort((a,b)=> (a.time || '99:99').localeCompare(b.time || '99:99') || a.title.localeCompare(b.title, 'he'));
+    const d = new Date(date + 'T00:00:00');
+    const isToday = date === today;
+    cols += `<div class="week-col">
+      <div class="week-col-head ${isToday ? 'is-today' : ''}">
+        <div class="wc-day">${DAY_NAMES[d.getDay()]}</div>
+        <div class="wc-date">${formatDate(date)}</div>
+      </div>
+      <div class="week-col-body">
+        ${dayTasks.length ? dayTasks.map(t => renderCompactCard(t, t.id === nextUpId)).join('') : '<div class="wc-empty">—</div>'}
+      </div>
+    </div>`;
+  }
+  return `<div class="week-columns">${cols}</div>`;
+}
+
+function renderCompactCard(t, isNextUp){
+  const cat = CAT[t.category];
+  const emoji = CAT_EMOJI[t.category];
+  const tm = timeDisplay(t);
+  const label = t.time || (tm.big === 'היום' || tm.big === 'מחר' ? tm.big : '');
+  return `<div class="wc-task ${isNextUp ? 'wc-next' : ''} ${t.done ? 'wc-done' : ''}" style="border-color:${cat.color}" data-edit="${t.id}">
+    <span class="wc-emoji">${emoji}</span>
+    <span class="wc-title">${escapeHtml(t.title)}</span>
+    ${label ? `<span class="wc-time">${label}</span>` : ''}
+  </div>`;
 }
 
 function renderWeekView(){
@@ -682,6 +857,15 @@ function renderWeekView(){
 
   const today = todayStr();
   const nextUpId = findNextUpId(active);
+
+  if(weekLayout === 'columns'){
+    content.innerHTML = nav + renderWeekColumns(weekStart, active, nextUpId, isCurrentWeek);
+    content.querySelectorAll('[data-edit]').forEach(el=>{
+      el.onclick = ()=> openEdit(el.dataset.edit);
+    });
+    wireWeekNav(content);
+    return;
+  }
 
   let html = nav;
 
@@ -728,6 +912,9 @@ function wireWeekNav(content){
   if(prevBtn) prevBtn.onclick = ()=>{ currentWeekStart = addDays(currentWeekStart, -7); render(); };
   if(nextBtn) nextBtn.onclick = ()=>{ currentWeekStart = addDays(currentWeekStart, 7); render(); };
   if(todayBtn) todayBtn.onclick = ()=>{ currentWeekStart = startOfWeek(todayStr()); render(); };
+  content.querySelectorAll('[data-layout]').forEach(btn=>{
+    btn.onclick = ()=>{ weekLayout = btn.dataset.layout; render(); };
+  });
 }
 
 function renderListView(){
